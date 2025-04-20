@@ -23,7 +23,24 @@ def process_category(category_name):
     df_clean.to_csv(output_path)
     print(f"Traitement terminé pour {category_name}. Données sauvegardées dans {output_path}")
 
-if __name__ == "__main__":
-    os.makedirs("data/processed", exist_ok=True)
-    for category in ["etfs", "actions", "cryptos"]:
-        process_category(category)
+def load_and_process_wallets(df):
+    # Créer une copie du DataFrame pour éviter de modifier l'original
+    df = pd.json_normalize(df)
+    df_processed = df.copy()
+    df_processed.rename(columns={
+        "id": "wallet_id",
+        "attributes.cryptocoin_id": "cryptocoin_id",
+        "attributes.cryptocoin_symbol": "symbol",
+        "attributes.balance": "balance",
+        "attributes.is_default": "is_default",
+        "attributes.name": "wallet_name",
+        "attributes.pending_transactions_count": "pending_tx_count",
+        "attributes.deleted": "deleted"
+    }, inplace=True)
+    
+    # Convertir la colonne balance en numérique
+    df_processed['balance'] = pd.to_numeric(df_processed['balance'], errors='coerce')
+    # Filtrer les wallets non supprimés
+    df_processed = df_processed[df_processed['deleted'] == False]
+    
+    return df_processed

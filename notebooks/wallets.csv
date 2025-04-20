@@ -1,0 +1,26 @@
+type,id,attributes.cryptocoin_id,attributes.cryptocoin_symbol,attributes.balance,attributes.is_default,attributes.name,attributes.pending_transactions_count,attributes.deleted,attributes.is_index
+wallet,58353f8f-3e02-43b1-ba1f-33f87d336280,1,BTC,0.02343852,True,BTC Wallet,0,False,False
+wallet,1efd8402-7c1d-66f4-8fef-2194cfb34f95,3,LTC,0.80974002,True,LTC Wallet,0,False,False
+wallet,cd10e5e9-42ab-496a-b954-01c335e8f453,5,ETH,0.00000000,True,ETH Wallet,0,False,False
+wallet,1efd8275-6ba9-657c-87e1-43a4bceae1c6,8,XRP,85.06874635,True,XRP Wallet,0,False,False
+wallet,1efe25ad-fc0c-62b4-a305-37a061c8a382,25,LINK,9.42482388,True,LINK Wallet,0,False,False
+wallet,1ef9f62d-398b-6e78-9044-954aa9fdc919,27,USDT,0.00000000,True,USDT Wallet,0,False,False
+wallet,1efdfcb2-69c3-6a66-a239-d1a75af1a438,30,USDC,0.00000000,True,USDC Wallet,0,False,False
+wallet,1efe25aa-4ce7-69c6-864e-c1f6e0fcd99a,31,TRX,0.00000000,True,TRX Wallet,0,False,False
+wallet,1eee14ac-e615-6bbc-9d40-c145640d7a5b,33,BEST,10.32251254,True,BEST Wallet,0,False,False
+wallet,1efd8401-6e14-6c3e-af1e-5bece007a697,38,DOGE,256.08349874,True,DOGE Wallet,0,False,False
+wallet,1efe25b1-620b-6260-b7a6-693faf013efb,58,AAVE,0.00000000,True,AAVE Wallet,0,False,False
+wallet,7c6c81b1-05de-4690-9a44-a88a84b0f091,135,SOL,0.00000000,True,SOL Wallet,0,False,False
+wallet,7f23522a-a653-4e06-b796-9285f9877a58,1112,FET,0.00000000,True,FET Wallet,0,False,False
+wallet,2fe92472-149e-4959-b950-6f0fa59cca9c,2629,AKT,0.00000000,True,AKT Wallet,0,False,False
+wallet,1efe2582-3494-6bee-9e2d-d1627f716180,2664,RAY,48.30727250,True,RAY Wallet,0,False,False
+wallet,df4648b7-74a3-43e4-818c-718f58ecf2ee,2915,AGIX,0.00000000,True,AGIX Wallet,0,False,False
+wallet,beca08cf-dcd3-4439-b889-f1a1efe1315a,2970,KAS,0.00000000,True,KAS Wallet,0,False,False
+wallet,1efe2594-602a-6da0-8f8e-33968c4a6e79,3064,ONDO,136.66908905,True,ONDO Wallet,0,False,False
+wallet,da2d93d4-7b73-4feb-9157-daa7f7f54910,3067,JUP,530.58296198,True,JUP Wallet,0,False,False
+wallet,1efbcaa3-52d4-6208-908a-6f3b72ea3501,3321,PENGU,0.00000000,True,PENGU Wallet,0,False,False
+wallet,8eb1cb73-361d-4eb8-a36f-b6c30ff1c7b7,3360,TRUMP,30.30815239,True,TRUMP Wallet,0,False,False
+wallet,1efd8423-c986-60b4-bd09-111df1b99292,3361,MELANIA,0.00000000,True,MELANIA Wallet,0,False,False
+wallet,3939ec8b-294a-467f-8392-6e3bede01325,3382,LINGO,3.23375000,True,LINGO Wallet,0,False,False
+wallet,93ee4f20-c647-4238-89d6-639592c7a908,3395,RFRM,290.33240187,True,RFRM Wallet,0,False,False
+wallet,e31a0675-bbc7-4647-878f-57373d864aee,3410,MLC,0.63103000,True,MLC Wallet,0,False,False
