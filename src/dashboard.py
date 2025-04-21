@@ -6,6 +6,7 @@ import sys
 
 from user import get_wallets  
 from ingestion import enrich_wallet_with_price  # ou incluez la fonction enrich_wallet_with_price ici
+from ai_utils import ask_portfolio_question, suggest_optimized_allocation  # nouveau
 
 # Titre du dashboard
 st.title("InvestmentWallet - Dashboard")
@@ -18,13 +19,6 @@ try:
     df_wallets = get_wallets(process=True)
 except Exception as e:
     st.error(f"Erreur lors de la récupération des wallets : {e}")
-    st.stop()
-
-# Enrichissement du DataFrame avec les prix de marché via Yahoo Finance
-try:
-    df_wallets = enrich_wallet_with_price(df_wallets)
-except Exception as e:
-    st.error(f"Erreur lors de l'enrichissement des wallets : {e}")
     st.stop()
 
 # Afficher le DataFrame dans le dashboard
@@ -49,6 +43,32 @@ else:
 
     # Afficher le graphique dans Streamlit
     st.pyplot(fig)
+
+
+st.header("🤖 Assistant IA - Portfolio Chat")
+
+# Interface de chat
+with st.expander("Poser une question sur votre portefeuille"):
+    user_question = st.text_input("Posez votre question ici (ex : Quel est mon actif le plus rentable ?)")
+    if user_question:
+        with st.spinner("L'IA réfléchit..."):
+            try:
+                answer = ask_portfolio_question(df_wallets, user_question)
+                st.markdown("**Réponse de l'assistant :**")
+                st.markdown(answer)
+            except Exception as e:
+                st.error(f"Erreur lors de l'appel à l'IA : {e}")
+
+# Suggestion d'allocation optimisée
+with st.expander("💡 Demander une allocation optimisée"):
+    if st.button("Générer une proposition"):
+        with st.spinner("L'IA analyse votre portefeuille..."):
+            try:
+                suggestion = suggest_optimized_allocation(df_wallets)
+                st.markdown("**Suggestion d'allocation :**")
+                st.markdown(suggestion)
+            except Exception as e:
+                st.error(f"Erreur IA : {e}")    
 
 # Quelques indications supplémentaires pour l'utilisateur
 st.markdown(

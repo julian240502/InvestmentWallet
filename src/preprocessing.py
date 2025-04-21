@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import sys
+from ingestion import enrich_wallet_with_price
 
 def load_data(file_path):
     # Chargement du CSV en DataFrame
@@ -42,5 +43,8 @@ def load_and_process_wallets(df):
     df_processed['balance'] = pd.to_numeric(df_processed['balance'], errors='coerce')
     # Filtrer les wallets non supprimés
     df_processed = df_processed[df_processed['deleted'] == False]
+    df_processed=df_processed[['symbol','balance']]
+
+    df_processed = enrich_wallet_with_price(df_processed)
     
     return df_processed
