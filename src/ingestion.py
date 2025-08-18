@@ -1,54 +1,61 @@
 import pandas as pd
 import yfinance as yf
-import numpy as np
+import time
+import streamlit as st
 
-import yfinance as yf
+#  Dictionnaire de cache local pour éviter les requêtes répétées
+_price_cache = {}
 
-def get_crypto_price(symbol):
+def get_crypto_price(symbol, retries=3, delay=2):
     """
-    Récupère le prix en euro d'un actif via Yahoo Finance.
-    Pour toute valeur non référencée (par exemple, si le prix n'est pas disponible),
-    la fonction affiche un avertissement et retourne None.
-
-    Args:
-        symbol (str): Le symbole de l'actif (par exemple 'BTC', 'ETH', 'BEST', etc.).
-
-    Returns:
-        float or None: Le prix en euro ou None si aucune donnée n'est disponible.
+    Récupère le prix en EUR depuis Yahoo Finance avec gestion des erreurs, retries et cache.
     """
+    if symbol in _price_cache:
+        return _price_cache[symbol]
+
     ticker_str = f"{symbol}-EUR"
-    ticker = yf.Ticker(ticker_str)
-    try:
-        price = ticker.info.get('regularMarketPrice')
-    except Exception as e:
-        print(f"Erreur lors de la récupération du ticker {ticker_str} : {e}")
-        return None
+    for attempt in range(retries):
+        try:
+            ticker = yf.Ticker(ticker_str)
+            price = ticker.info.get('regularMarketPrice')
+            if price is not None:
+                _price_cache[symbol] = price
+                return price
+            else:
+                print(f"[{symbol}] Aucune donnée de prix trouvée.")
+        except Exception as e:
+            print(f"[{symbol}] Erreur récupération prix (tentative {attempt+1}): {e}")
 
-    if price is None:
-        print(f"Attention : Le symbole '{symbol}' n'est pas référencé sur Yahoo Finance. Aucune donnée de prix disponible.")
-        return None
-    return price
+        time.sleep(delay)
+
+    print(f"[{symbol}] Erreur persistante ou rate limit. Aucun prix.")
+    _price_cache[symbol] = None
+    return None
 
 
-def enrich_wallet_with_price(df_wallets):
-    """
-    Enrichit le DataFrame des wallets avec le prix (en euro) et la valeur totale (balance * prix).
-    Pour les actifs dont le symbole n'est pas référencé, le prix sera None.
+def enrich_wallet_with_price(df_wallets: pd.DataFrame) -> pd.DataFrame:
+    df_wallets = df_wallets.copy()
+    symbols = df_wallets['symbol'].tolist()
+    prices = []
 
-    Args:
-        df_wallets (pd.DataFrame): DataFrame contenant les données des wallets,
-                                   avec au moins les colonnes 'symbol' et 'balance'.
+    progress_bar = st.progress(0, text="Chargement des prix Yahoo Finance...")
 
-    Returns:
-        pd.DataFrame: Le DataFrame enrichi avec les colonnes 'price' et 'total_value'.
-    """
-    # Appliquer la fonction get_crypto_price à la colonne 'symbol'
-    df_wallets['price'] = df_wallets['symbol'].apply(get_crypto_price)
-    
-    # Convertir 'balance' en numérique si ce n'est pas déjà fait
+    for i, symbol in enumerate(symbols):
+        price = get_crypto_price(symbol)
+
+        prices.append(price)
+        progress = (i + 1) / len(symbols)
+        progress_bar.progress(progress, text=f"Chargement des prix ({int(progress * 100)}%)")
+
+        time.sleep(1.5)
+
+    progress_bar.empty()
+
+    df_wallets['price'] = prices
     df_wallets['balance'] = pd.to_numeric(df_wallets['balance'], errors='coerce')
-    
-    # Calculer la valeur totale de chaque wallet : balance * price.
-    # Si 'price' est None, le résultat sera NaN.
     df_wallets['total_value'] = df_wallets['balance'] * df_wallets['price']
+
+    df_wallets = df_wallets.dropna(subset=["price", "total_value"])
+    df_wallets = df_wallets[df_wallets["total_value"] > 0]
+
     return df_wallets
