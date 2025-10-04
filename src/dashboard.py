@@ -4,11 +4,8 @@ import altair as alt
 from datetime import datetime
 
 from user import get_wallets
-from ingestion import enrich_wallet_with_price
+from ingestion import enrich_wallet_with_price, get_unsupported_symbols
 from ai_utils import ask_portfolio_question, suggest_optimized_allocation
-
-# Symbols ignored (not available or unsupported by Yahoo Finance)
-SYMBOL_BLACKLIST = ['BEST', 'XYZ', 'JUP', 'AKT', 'VSN', 'MLC', 'LINGO', 'TRUMP', 'PENGU', 'ONDO', 'AGIX', 'KAS']
 
 st.set_page_config(
     page_title="InvestmentWallet Dashboard",
@@ -65,7 +62,9 @@ st.markdown(
 @st.cache_data
 def get_and_enrich_wallets():
     df = get_wallets(process=True)
-    df = df[~df['symbol'].isin(SYMBOL_BLACKLIST)]
+    unsupported_symbols = get_unsupported_symbols()
+    df["symbol"] = df["symbol"].str.upper()
+    df = df[~df['symbol'].isin(unsupported_symbols)]
     df = enrich_wallet_with_price(df)
     return df
 
@@ -94,6 +93,13 @@ if "wallets" not in st.session_state:
 
 # Always use the cached version
 df_wallets = st.session_state.wallets
+unsupported_filtered = df_wallets.attrs.get("unsupported_symbols", [])
+
+if unsupported_filtered:
+    st.sidebar.warning(
+        "Les actifs suivants ont été ignorés car ils ne sont pas disponibles sur Yahoo Finance : "
+        + ", ".join(unsupported_filtered)
+    )
 
 if df_wallets.empty:
     st.warning("No wallet found or all wallets are marked as deleted.")
