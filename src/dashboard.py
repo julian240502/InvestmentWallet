@@ -4,7 +4,7 @@ import altair as alt
 from datetime import datetime
 
 from user import get_wallets
-from ingestion import enrich_wallet_with_price, get_unsupported_symbols
+from ingestion import enrich_wallet_with_price
 from ai_utils import ask_portfolio_question, suggest_optimized_allocation
 
 st.set_page_config(
@@ -62,11 +62,9 @@ st.markdown(
 @st.cache_data
 def get_and_enrich_wallets():
     df = get_wallets(process=True)
-    unsupported_symbols = get_unsupported_symbols()
-    df["symbol"] = df["symbol"].str.upper()
-    df = df[~df['symbol'].isin(unsupported_symbols)]
-    df = enrich_wallet_with_price(df)
-    return df
+    if {"price", "total_value"}.issubset(df.columns):
+        return df
+    return enrich_wallet_with_price(df)
 
 st.title("💼 InvestmentWallet Dashboard")
 st.caption("Dernière mise à jour : {}".format(datetime.now().strftime("%d %B %Y - %H:%M")))
@@ -94,6 +92,7 @@ if "wallets" not in st.session_state:
 # Always use the cached version
 df_wallets = st.session_state.wallets
 unsupported_filtered = df_wallets.attrs.get("unsupported_symbols", [])
+missing_prices = df_wallets.attrs.get("missing_price_symbols", [])
 
 if unsupported_filtered:
     st.sidebar.warning(
@@ -101,10 +100,17 @@ if unsupported_filtered:
         + ", ".join(unsupported_filtered)
     )
 
+if missing_prices:
+    st.sidebar.info(
+        "Prix indisponible pour : " + ", ".join(missing_prices) + ". Valeur estimée à 0 € pour ces actifs."
+    )
+
 if df_wallets.empty:
     st.warning("No wallet found or all wallets are marked as deleted.")
 
-unique_symbols = sorted(df_wallets["symbol"].unique())
+df_wallets["total_value"] = df_wallets["total_value"].fillna(0.0)
+
+unique_symbols = sorted(df_wallets["symbol"].dropna().unique())
 selected_symbols = st.sidebar.multiselect(
     "Sélectionnez les actifs à afficher",
     options=unique_symbols,
@@ -120,28 +126,38 @@ min_threshold = st.sidebar.slider(
     step=max(10.0, round(max_portfolio_value / 20, 2)) if max_portfolio_value else 10.0,
 )
 
-filtered_wallets = df_wallets[df_wallets["symbol"].isin(selected_symbols)]
+filtered_wallets = df_wallets[df_wallets["symbol"].isin(selected_symbols)].copy()
 filtered_wallets = filtered_wallets[filtered_wallets["total_value"] >= min_threshold]
 
 st.markdown("### Portefeuille Utilisateur")
 st.markdown("Retrouvez ci-dessous une vue consolidée de vos actifs Bitpanda.")
 
+aggregated = pd.DataFrame(columns=["symbol", "total_value"])
+valued_assets = pd.DataFrame(columns=["symbol", "total_value"])
+
 if filtered_wallets.empty:
     st.info("Aucun actif ne correspond aux filtres sélectionnés.")
 else:
     aggregated = filtered_wallets.groupby("symbol", as_index=False)["total_value"].sum()
-    total_value = aggregated["total_value"].sum()
-    top_asset_row = aggregated.sort_values("total_value", ascending=False).head(1)
+    valued_assets = aggregated[aggregated["total_value"] > 0]
+
+    total_value = float(valued_assets["total_value"].sum()) if not valued_assets.empty else 0.0
+    top_asset_row = valued_assets.sort_values("total_value", ascending=False).head(1)
     top_asset = top_asset_row.iloc[0]["symbol"] if not top_asset_row.empty else "-"
-    top_asset_value = top_asset_row.iloc[0]["total_value"] if not top_asset_row.empty else 0.0
+    top_asset_value = (
+        float(top_asset_row.iloc[0]["total_value"]) if not top_asset_row.empty else 0.0
+    )
 
     metric_cols = st.columns(3)
     with metric_cols[0]:
-        st.markdown("<div class='metric-card'><h3>Valeur Totale</h3><p>{:,.2f} €</p></div>".format(total_value), unsafe_allow_html=True)
+        st.markdown(
+            "<div class='metric-card'><h3>Valeur Totale</h3><p>{:,.2f} €</p></div>".format(total_value),
+            unsafe_allow_html=True,
+        )
     with metric_cols[1]:
         st.markdown(
             "<div class='metric-card'><h3>Nombre d'actifs</h3><p>{}</p></div>".format(
-                aggregated.shape[0]
+                filtered_wallets["symbol"].nunique()
             ),
             unsafe_allow_html=True,
         )
@@ -163,7 +179,7 @@ else:
 st.markdown("---")
 st.markdown("<p class='section-title'>Répartition du portefeuille</p>", unsafe_allow_html=True)
 
-if filtered_wallets.empty:
+if filtered_wallets.empty or valued_assets.empty:
     st.warning("No asset with usable total value was found.")
 else:
     chart_view = st.radio(
@@ -172,13 +188,13 @@ else:
         horizontal=True,
     )
 
-    aggregated = filtered_wallets.groupby("symbol", as_index=False)["total_value"].sum()
-    total_sum = aggregated["total_value"].sum()
-    aggregated["part"] = aggregated["total_value"] / total_sum if total_sum else 0
+    chart_data = valued_assets.copy()
+    total_sum = chart_data["total_value"].sum()
+    chart_data["part"] = chart_data["total_value"] / total_sum if total_sum else 0
 
     if chart_view == "Diagramme en anneau":
         chart = (
-            alt.Chart(aggregated)
+            alt.Chart(chart_data)
             .mark_arc(innerRadius=60, outerRadius=120)
             .encode(
                 theta=alt.Theta("total_value", stack=True, title="Valeur totale (€)"),
@@ -193,7 +209,7 @@ else:
         st.altair_chart(chart, use_container_width=True)
     else:
         chart = (
-            alt.Chart(aggregated)
+            alt.Chart(chart_data)
             .mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6)
             .encode(
                 x=alt.X("symbol", sort="-y", title="Actifs"),

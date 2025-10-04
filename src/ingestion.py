@@ -55,9 +55,7 @@ def get_unsupported_symbols():
     return frozenset(symbols)
 
 def get_crypto_price(symbol, retries=3, delay=2):
-    """
-    Récupère le prix en EUR depuis Yahoo Finance avec gestion des erreurs, retries et cache.
-    """
+    """Récupère le prix en EUR depuis Yahoo Finance avec gestion des erreurs, retries et cache."""
     symbol_key = symbol.upper()
 
     if symbol_key in _price_cache:
@@ -90,7 +88,14 @@ def get_crypto_price(symbol, retries=3, delay=2):
 
 def enrich_wallet_with_price(df_wallets: pd.DataFrame) -> pd.DataFrame:
     df_wallets = df_wallets.copy()
-    df_wallets['symbol'] = df_wallets['symbol'].str.upper()
+
+    if df_wallets.empty:
+        df_wallets.attrs["unsupported_symbols"] = []
+        df_wallets.attrs["missing_price_symbols"] = []
+        return df_wallets
+
+    df_wallets['symbol'] = df_wallets['symbol'].astype(str).str.upper()
+    df_wallets['balance'] = pd.to_numeric(df_wallets['balance'], errors='coerce').fillna(0.0)
     symbols = df_wallets['symbol'].tolist()
     prices = []
 
@@ -98,14 +103,19 @@ def enrich_wallet_with_price(df_wallets: pd.DataFrame) -> pd.DataFrame:
 
     unsupported_symbols = get_unsupported_symbols()
     skipped_symbols = set()
+    missing_price_symbols = set()
 
     for i, symbol in enumerate(symbols):
         already_cached = symbol in _price_cache
         if symbol in unsupported_symbols:
             skipped_symbols.add(symbol)
+
         price = get_crypto_price(symbol)
+        if price is None:
+            missing_price_symbols.add(symbol)
 
         prices.append(price)
+
         progress = (i + 1) / len(symbols)
         progress_bar.progress(progress, text=f"Chargement des prix ({int(progress * 100)}%)")
 
@@ -114,13 +124,12 @@ def enrich_wallet_with_price(df_wallets: pd.DataFrame) -> pd.DataFrame:
 
     progress_bar.empty()
 
-    df_wallets['price'] = prices
-    df_wallets['balance'] = pd.to_numeric(df_wallets['balance'], errors='coerce')
-    df_wallets['total_value'] = df_wallets['balance'] * df_wallets['price']
-
-    df_wallets = df_wallets.dropna(subset=["price", "total_value"])
-    df_wallets = df_wallets[df_wallets["total_value"] > 0]
+    df_wallets['price'] = pd.to_numeric(prices, errors='coerce')
+    df_wallets['total_value'] = (df_wallets['balance'] * df_wallets['price']).fillna(0.0)
 
     df_wallets.attrs["unsupported_symbols"] = sorted(skipped_symbols)
+    df_wallets.attrs["missing_price_symbols"] = sorted(
+        missing_price_symbols.difference(skipped_symbols)
+    )
 
     return df_wallets
