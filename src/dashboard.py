@@ -1,81 +1,95 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
-import sys
 
 from user import get_wallets  
-from ingestion import enrich_wallet_with_price  # ou incluez la fonction enrich_wallet_with_price ici
-from ai_utils import ask_portfolio_question, suggest_optimized_allocation  # nouveau
+from ingestion import enrich_wallet_with_price  
+from ai_utils import ask_portfolio_question, suggest_optimized_allocation
 
-# Titre du dashboard
+# Symbols ignored (not available or unsupported by Yahoo Finance)
+SYMBOL_BLACKLIST = ['BEST', 'XYZ', 'JUP', 'AKT', 'VSN', 'MLC', 'LINGO', 'TRUMP', 'PENGU', 'ONDO', 'AGIX', 'KAS']
+
+@st.cache_data
+def get_and_enrich_wallets():
+    df = get_wallets(process=True)
+    df = df[~df['symbol'].isin(SYMBOL_BLACKLIST)]
+    df = enrich_wallet_with_price(df)
+    return df
+
 st.title("InvestmentWallet - Dashboard")
 
-st.header("Portefeuille de l'utilisateur")
-st.markdown("Voici la liste des wallets récupérés via l'API Bitpanda.")
+st.header("User Portfolio")
+st.markdown("Below is the list of wallets retrieved from the Bitpanda API.")
 
-# Récupération des données avec normalisation pour obtenir un DataFrame
-try:
-    df_wallets = get_wallets(process=True)
-except Exception as e:
-    st.error(f"Erreur lors de la récupération des wallets : {e}")
-    st.stop()
+if "wallets" not in st.session_state:
+    with st.spinner("Loading portfolio..."):
+        try:
+            df = get_and_enrich_wallets()
+            st.session_state.wallets = df
+        except Exception as e:
+            st.error(f"Error retrieving wallet data: {e}")
+            st.stop()
 
-# Afficher le DataFrame dans le dashboard
-st.dataframe(df_wallets)
+# Always use the cached version
+df_wallets = st.session_state.wallets
 
-st.header("Répartition du portefeuille")
-# Filtrer les entrées dont la valeur totale n'est pas nulle ou manquante
-df_valid = df_wallets.dropna(subset=["total_value"])
-df_valid = df_valid[df_valid["total_value"] > 0]
+if df_wallets.empty:
+    st.warning("No wallet found or all wallets are marked as deleted.")
 
-if df_valid.empty:
-    st.warning("Aucun actif avec une valeur totale positive n'a été trouvé pour le moment.")
+# Show the final DataFrame
+st.dataframe(df_wallets[["symbol", "balance", "price", "total_value"]].reset_index(drop=True))
+
+# Portfolio breakdown
+st.header("Portfolio Breakdown")
+
+if df_wallets.empty:
+    st.warning("No asset with usable total value was found.")
 else:
-    # Agréger la valeur totale par symbole (par exemple, BTC, ETH, etc.)
-    aggregated = df_valid.groupby("symbol")["total_value"].sum()
+    aggregated = df_wallets.groupby("symbol")["total_value"].sum()
 
-    # Création du graphique en camembert
     fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
-    ax.pie(aggregated, labels=aggregated.index, autopct='%1.1f%%', startangle=90, textprops={'fontsize': 5})
-    
+    ax.pie(
+        aggregated,
+        labels=aggregated.index,
+        autopct='%1.1f%%',
+        startangle=90,
+        textprops={'fontsize': 6}
+    )
     fig.tight_layout()
-
-    # Afficher le graphique dans Streamlit
     st.pyplot(fig)
 
+# AI Assistant
+st.header("🤖 AI Assistant - Portfolio Chat")
 
-st.header("🤖 Assistant IA - Portfolio Chat")
+# Chat interface
+st.subheader("Ask a question about your portfolio")
 
-# Interface de chat
-with st.expander("Poser une question sur votre portefeuille"):
-    user_question = st.text_input("Posez votre question ici (ex : Quel est mon actif le plus rentable ?)")
-    if user_question:
-        with st.spinner("L'IA réfléchit..."):
-            try:
-                answer = ask_portfolio_question(df_wallets, user_question)
-                st.markdown("**Réponse de l'assistant :**")
-                st.markdown(answer)
-            except Exception as e:
-                st.error(f"Erreur lors de l'appel à l'IA : {e}")
+user_question = st.text_input("Type your question here (e.g., What is my most valuable asset?)")
+if user_question:
+    with st.spinner("Thinking..."):
+        try:
+            answer = ask_portfolio_question(df_wallets, user_question)
+            st.markdown("**Assistant's response:**")
+            st.markdown(answer)
+        except Exception as e:
+            st.error(f"AI response error: {e}")
 
-# Suggestion d'allocation optimisée
-with st.expander("💡 Demander une allocation optimisée"):
-    if st.button("Générer une proposition"):
-        with st.spinner("L'IA analyse votre portefeuille..."):
-            try:
-                suggestion = suggest_optimized_allocation(df_wallets)
-                st.markdown("**Suggestion d'allocation :**")
-                st.markdown(suggestion)
-            except Exception as e:
-                st.error(f"Erreur IA : {e}")    
+# Allocation suggestion
+st.subheader("Request an optimized allocation")
 
-# Quelques indications supplémentaires pour l'utilisateur
+if st.button("Generate a suggestion"):
+    with st.spinner("The assistant is analyzing your portfolio..."):
+        try:
+            suggestion = suggest_optimized_allocation(df_wallets)
+            st.markdown("**Optimized allocation suggestion:**")
+            st.markdown(suggestion)
+        except Exception as e:
+            st.error(f"AI error: {e}") 
+
+# Additional user guidance
 st.markdown(
     """
-    **Instructions complémentaires :**
-    - Ce dashboard se met à jour dès que vous actualisez la page.
-    - Vous pouvez ajouter d'autres visualisations (courbes d'évolution, indicateurs de performance, etc.)
-      pour enrichir votre dashboard.
+    **Additional information:**
+    - This dashboard refreshes every time the page is reloaded.
     """
 )
