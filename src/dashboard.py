@@ -76,7 +76,7 @@ st.sidebar.caption(
 refresh_clicked = st.sidebar.button("🔄 Rafraîchir les données", use_container_width=True)
 if refresh_clicked:
     st.session_state.pop("wallets", None)
-    st.experimental_rerun()
+    st.rerun()
 
 st.sidebar.markdown("---")
 
